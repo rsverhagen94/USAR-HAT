@@ -16,31 +16,19 @@ class MessageLogger(GridWorldLogger):
 
         log_data = {
             'total_number_messages_human': 0,
-            'total_number_messages_agent':0,
-            'average_message_length_human':0,
-            'average_message_length_agent':0
         }
 
         gwmm = grid_world.message_manager
         t = grid_world.current_nr_ticks-1
         tot_messages_human = 0
-        tot_messages_agent = 0
-
         mssg_len_human = []
-        mssg_len_agent = []
         for i in range(0,t):
             if i in gwmm.preprocessed_messages.keys():
                 for mssg in gwmm.preprocessed_messages[i]:
                     if 'human' in mssg.from_id:
                         tot_messages_human+=1
                         mssg_len_human.append(len(mssg.content.split()))
-                    if 'RescueBot' in mssg.from_id:
-                        tot_messages_agent+=1
-                        mssg_len_agent.append(len(mssg.content.split()))
         log_data['total_number_messages_human'] = tot_messages_human
-        log_data['total_number_messages_agent'] = int(tot_messages_agent/2)
-        log_data['average_message_length_human'] = round(np.mean(mssg_len_human),2)
-        log_data['average_message_length_agent'] = round(np.mean(mssg_len_agent),2)
 
         return log_data 
         

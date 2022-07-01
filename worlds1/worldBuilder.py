@@ -387,6 +387,7 @@ class CollectionGoal(WorldGoal):
 
         # We also track the progress
         self.__progress = 0
+        self._completeness = 0
 
     def goal_reached(self, grid_world: GridWorld):
         if grid_world.current_nr_ticks >= self.max_nr_ticks:
@@ -402,12 +403,24 @@ class CollectionGoal(WorldGoal):
             self.__find_drop_off_locations(grid_world)
 
         # Go through each drop zone, and check if the blocks are there in the right order
-        is_satisfied, progress = self.__check_completion(grid_world)
+        is_satisfied, progress, collected = self.__check_completion(grid_world)
 
         # Progress in percentage
         self.__progress = progress / sum([len(goal_blocks)\
             for goal_blocks in self.__drop_off.values()])
         return is_satisfied
+
+    def completeness(self, grid_world:GridWorld):
+        if self.__drop_off =={}:  # find all drop off locations, its tile ID's and goal blocks
+            self.__find_drop_off_locations(grid_world)
+
+        # Go through each drop zone, and check if the blocks are there in the right order
+        is_satisfied, progress, completeness = self.__check_completion(grid_world)
+
+        # Progress in percentage
+        self.__completeness =  completeness / sum([len(goal_blocks)\
+            for goal_blocks in self.__drop_off.values()])
+        return self.__completeness*100
 
     def __find_drop_off_locations(self, grid_world):
 
@@ -449,7 +462,7 @@ class CollectionGoal(WorldGoal):
                 for block in blocks:
                     if block.location == loc:
                         # Add to self.drop_off
-                        self.__drop_off_zone[zone_nr][rank] = [loc, block.visualize_shape, block.visualize_colour, None]
+                        self.__drop_off_zone[zone_nr][rank] = [loc, block.properties['img_name'][8:-4], None]
                         for i in self.__drop_off_zone.keys():
                             self.__drop_off[i] = {}
                             vals = list(self.__drop_off_zone[i].values())
@@ -467,8 +480,7 @@ class CollectionGoal(WorldGoal):
             for rank, block_data in goal_blocks.items():
                 loc = block_data[0]  # the location, needed to find blocks here
                 shape = block_data[1]  # the desired shape
-                colour = block_data[2]  # the desired colour
-                tick = block_data[3]
+                tick = block_data[2]
 
                 # Retrieve all objects, the object ids at the location and obtain all BW4T Blocks from it
                 all_objs = grid_world.environment_objects
@@ -479,20 +491,24 @@ class CollectionGoal(WorldGoal):
 
                 # Check if there is a block, and if so if it is the right one and the tick is not yet set, then set the
                 # current tick.
-                if len(blocks) > 0 and blocks[0].visualize_shape == shape and blocks[0].visualize_colour == colour and \
+                if len(blocks) > 0 and blocks[0].properties['img_name'][8:-4] == shape and \
                         tick is None:
-                    self.__drop_off[zone_nr][rank][3] = curr_tick
+                    self.__drop_off[zone_nr][rank][2] = curr_tick
                 # if there is no block, reset its tick to None
                 elif len(blocks) == 0:
-                    self.__drop_off[zone_nr][rank][3] = None
+                    self.__drop_off[zone_nr][rank][2] = None
 
         # Now check if all blocks are collected in the right order
         is_satisfied = True
         progress = 0
+        collected = 0
         for zone_nr, goal_blocks in self.__drop_off.items():
             zone_satisfied = True
-            ticks = [goal_blocks[r][3] for r in range(len(goal_blocks))]  # list of ticks in rank order
+            ticks = [goal_blocks[r][2] for r in range(len(goal_blocks))]  # list of ticks in rank order
 
+            for tick in ticks:
+                if tick is not None:
+                    collected+=1
             # check if all ticks are increasing
             for idx, tick in enumerate(ticks[:-1]):
                 if tick is None or ticks[idx+1] is None or not tick < ticks[idx+1]:
@@ -503,8 +519,8 @@ class CollectionGoal(WorldGoal):
             # if all ticks were increasing, check if the last tick is set and set progress to full for this zone
             if zone_satisfied and ticks[-1] is not None:
                 progress += len(goal_blocks)
-
+            
             # update our satisfied boolean
             is_satisfied = is_satisfied and zone_satisfied
 
-        return is_satisfied, progress
+        return is_satisfied, progress, collected
